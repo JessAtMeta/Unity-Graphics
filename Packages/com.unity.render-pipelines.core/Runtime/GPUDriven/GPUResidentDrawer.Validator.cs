@@ -8,6 +8,7 @@ namespace UnityEngine.Rendering
 {
     public partial class GPUResidentDrawer
     {
+#if !UNITY_WEBGL_RENDERER_ONLY
         static class Strings
         {
             public static readonly string drawerModeDisabled = $"{nameof(GPUResidentDrawer)} Drawer mode is disabled. Enable it on your current {nameof(RenderPipelineAsset)}";
@@ -18,6 +19,7 @@ namespace UnityEngine.Rendering
             public static readonly string batchRendererGroupShaderStrippingModeInvalid = $"{nameof(GPUResidentDrawer)} \"BatchRendererGroup Variants\" setting must be \"Keep All\". " +
                 " The current setting will cause errors when building a player because all DOTS instancing shaders will be stripped" +
                 " To fix, modify Graphics settings and set \"BatchRendererGroup Variants\" to \"Keep All\".";
+            public static readonly string visionOSNotSupported = $"{nameof(GPUResidentDrawer)} Disabled on VisionOS as it is non applicable. This platform uses a custom rendering path and doesn't go through the resident drawer.";
         }
 
         internal static bool IsProjectSupported()
@@ -29,6 +31,13 @@ namespace UnityEngine.Rendering
         {
             message = string.Empty;
             severity = LogType.Log;
+
+            if (Application.platform == RuntimePlatform.VisionOS)
+            {
+                message = Strings.visionOSNotSupported;
+                severity = LogType.Log;
+                return false;
+            }
 
             // The GPUResidentDrawer only has support when the RawBuffer path of providing data
             // ConstantBuffer path and any other unsupported platforms early out here
@@ -88,7 +97,7 @@ namespace UnityEngine.Rendering
                 return false;
 #endif
             // If we are forcing the system, no need to perform further checks
-            if (IsForcedOnViaCommandLine())
+            if (IsForcedOnViaCommandLine() || MaintainContext)
                 return true;
 
             if (GraphicsSettings.currentRenderPipeline is not IGPUResidentRenderPipeline asset)
@@ -114,5 +123,27 @@ namespace UnityEngine.Rendering
                     break;
             }
         }
+#else
+        internal static bool IsProjectSupported()
+        {
+            return false;
+        }
+
+        internal static bool IsProjectSupported(out string message, out LogType severity)
+        {
+            message = string.Empty;
+            severity = LogType.Log;
+            return false;
+        }
+
+        internal static bool IsGPUResidentDrawerSupportedBySRP(GPUResidentDrawerSettings settings, out string message, out LogType severity)
+        {
+            message = string.Empty;
+            severity = LogType.Log;
+            return false;
+        }
+
+        internal static void LogMessage(string message, LogType severity) {}
+#endif
     }
 }

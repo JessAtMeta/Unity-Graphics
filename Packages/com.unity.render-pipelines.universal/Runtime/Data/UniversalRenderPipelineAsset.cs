@@ -379,7 +379,11 @@ namespace UnityEngine.Rendering.Universal
         BayerMatrix,
 
         /// <summary>Unity uses the precomputed blue noise texture to compute the LOD cross-fade dithering.</summary>
-        BlueNoise
+        BlueNoise,
+
+        /// <summary>Unity uses stencil test to make 2x2 pixel dithering pattern by using 2 stencil bits (4 and 8). This option significantly decreases the number of the shader variants, while GPU performance cost becomes slightly higher.</summary>
+        [InspectorName("2x2 Stencil"), Tooltip("2x2 pixel dithering pattern by stencil test with 2 stencil bits (4 and 8). This option decreases the number of the shader variants.")]
+        Stencil
     }
 
     /// <summary>
@@ -413,10 +417,12 @@ namespace UnityEngine.Rendering.Universal
     internal struct DeprecationMessage
     {
         internal const string CompatibilityScriptingAPIObsolete = "This rendering path is for compatibility mode only (when Render Graph is disabled). Use Render Graph API instead.";
-        internal const string CompatibilityScriptingAPIConsoleWarning = "The project currently uses the compatibility mode where the Render Graph API is disabled. Support for this mode will be removed in future Unity versions. Migrate existing ScriptableRenderPasses to the new RenderGraph API. After the migration, disable the compatibility mode in Edit > Projects Settings > Graphics > Render Graph.";
+#if URP_COMPATIBILITY_MODE
+        internal const string CompatibilityScriptingAPIConsoleWarning = "Your project uses Compatibility Mode, which disables the render graph system. Compatibility Mode is deprecated. Migrate your ScriptableRenderPasses to the Render Graph API instead. After you migrate, go to Edit > Project Settings > Player and remove the URP_COMPATIBILITY_MODE define from the Scripting Define Symbols. If you don't remove the define, build time and build size are slightly increased.";
+#endif
     }
 
-#if UNITY_EDITOR
+#if UNITY_EDITOR && URP_COMPATIBILITY_MODE
     internal class WarnUsingNonRenderGraph
     {
         [InitializeOnLoadMethod]
@@ -480,6 +486,7 @@ namespace UnityEngine.Rendering.Universal
         [ShaderKeywordFilter.RemoveIf(false, keywordNames: ShaderKeywordStrings.LOD_FADE_CROSSFADE)]
 #endif
         [SerializeField] bool m_EnableLODCrossFade = true;
+
         [SerializeField] LODCrossFadeDitheringType m_LODCrossFadeDitheringType = LODCrossFadeDitheringType.BlueNoise;
 
         // ShEvalMode.Auto is handled in shader preprocessor.
@@ -532,6 +539,7 @@ namespace UnityEngine.Rendering.Universal
         [ShaderKeywordFilter.SelectOrRemove(true, keywordNames: ShaderKeywordStrings.ReflectionProbeBoxProjection)]
 #endif
         [SerializeField] bool m_ReflectionProbeBoxProjection = false;
+        [SerializeField] bool m_ReflectionProbeAtlas = true;
 
         // Shadows Settings
         [SerializeField] float m_ShadowDistance = 50.0f;
@@ -698,9 +706,9 @@ namespace UnityEngine.Rendering.Universal
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1812")]
-        internal class CreateUniversalPipelineAsset : EndNameEditAction
+        internal class CreateUniversalPipelineAsset : AssetCreationEndAction
         {
-            public override void Action(int instanceId, string pathName, string resourceFile)
+            public override void Action(EntityId entityId, string pathName, string resourceFile)
             {
                 //Create asset
                 AssetDatabase.CreateAsset(Create(CreateRendererAsset(pathName, RendererType.UniversalRenderer)), pathName);
@@ -710,7 +718,7 @@ namespace UnityEngine.Rendering.Universal
         [MenuItem("Assets/Create/Rendering/URP Asset (with Universal Renderer)", priority = CoreUtils.Sections.section2 + CoreUtils.Priorities.assetsCreateRenderingMenuPriority + 1)]
         static void CreateUniversalPipeline()
         {
-            ProjectWindowUtil.StartNameEditingIfProjectWindowExists(0, CreateInstance<CreateUniversalPipelineAsset>(),
+            ProjectWindowUtil.StartNameEditingIfProjectWindowExists(EntityId.None, CreateInstance<CreateUniversalPipelineAsset>(),
                 "New Universal Render Pipeline Asset.asset", null, null);
         }
 
@@ -1361,6 +1369,15 @@ namespace UnityEngine.Rendering.Universal
         }
 
         /// <summary>
+        /// Specifies if this <c>UniversalRenderPipelineAsset</c> should use the reflection probe atlas for Forward Plus.
+        /// </summary>
+        public bool reflectionProbeAtlas
+        {
+            get => m_ReflectionProbeAtlas;
+            internal set => m_ReflectionProbeAtlas = value;
+        }
+
+        /// <summary>
         /// Controls the maximum distance at which shadows are visible.
         /// </summary>
         public float shadowDistance
@@ -1528,6 +1545,7 @@ namespace UnityEngine.Rendering.Universal
         /// </summary>
         [Obsolete("This has been deprecated, please use GraphicsSettings.GetRenderPipelineSettings<RenderGraphSettings>().enableRenderCompatibilityMode instead.")]
         public bool enableRenderGraph
+#if URP_COMPATIBILITY_MODE
         {
             get
             {
@@ -1540,6 +1558,9 @@ namespace UnityEngine.Rendering.Universal
                 return false;
             }
         }
+#else
+            => true;
+#endif
 
         internal void OnEnableRenderGraphChanged()
         {
@@ -1666,16 +1687,17 @@ namespace UnityEngine.Rendering.Universal
         static class Strings
         {
             public static readonly string notURPRenderer = $"{nameof(GPUResidentDrawer)} Disabled due to some configured Universal Renderers not being {nameof(UniversalRendererData)}.";
-            public static readonly string forwardPlusMissing = $"{nameof(GPUResidentDrawer)} Disabled due to some configured Universal Renderers not supporting Forward+.";
+            public static readonly string renderingModeIncompatible = $"{nameof(GPUResidentDrawer)} Disabled due to some configured Universal Renderers not using the Forward+ or Deferred+ rendering paths.";
         }
 
         /// <inheritdoc/>
-        public bool IsGPUResidentDrawerSupportedBySRP(out string message, out LogType severty)
+        public bool IsGPUResidentDrawerSupportedBySRP(out string message, out LogType severity)
         {
             message = string.Empty;
-            severty = LogType.Warning;
+            severity = LogType.Warning;
 
-            // if any of the renderers are not set to Forward+ return false
+            // Only the URP rendering paths using the cluster light loop (F+ lights & probes) can be used with GRD,
+            // since BiRP-style per-object lights and reflection probes are incompatible with DOTS instancing.
             foreach (var rendererData in m_RendererDataList)
             {
                 if (rendererData is not UniversalRendererData universalRendererData)
@@ -1684,11 +1706,11 @@ namespace UnityEngine.Rendering.Universal
                     return false;
                 }
 
-                if (universalRendererData.renderingMode == RenderingMode.ForwardPlus)
-                    continue;
-
-                message = Strings.forwardPlusMissing;
-                return false;
+                if (!universalRendererData.usesClusterLightLoop)
+                {
+                    message = Strings.renderingModeIncompatible;
+                    return false;
+                }
             }
 
             return true;
@@ -1822,15 +1844,15 @@ namespace UnityEngine.Rendering.Universal
 #if UNITY_EDITOR
             if (k_AssetPreviousVersion != k_AssetVersion)
             {
-                EditorApplication.delayCall += () => UpgradeAsset(this.GetInstanceID());
+                EditorApplication.delayCall += () => UpgradeAsset(this.GetEntityId());
             }
 #endif
         }
 
 #if UNITY_EDITOR
-        static void UpgradeAsset(int assetInstanceID)
+        static void UpgradeAsset(EntityId assetInstanceID)
         {
-            UniversalRenderPipelineAsset asset = EditorUtility.InstanceIDToObject(assetInstanceID) as UniversalRenderPipelineAsset;
+            UniversalRenderPipelineAsset asset = EditorUtility.EntityIdToObject(assetInstanceID) as UniversalRenderPipelineAsset;
 
             if (asset.k_AssetPreviousVersion < 5)
             {

@@ -36,9 +36,9 @@ namespace UnityEngine.Rendering.Universal
 #pragma warning restore CS0414
 
 #if UNITY_EDITOR
-        public static void UpgradeAsset(int assetInstanceID)
+        public static void UpgradeAsset(EntityId assetInstanceID)
         {
-            if (EditorUtility.InstanceIDToObject(assetInstanceID) is not UniversalRenderPipelineGlobalSettings asset)
+            if (EditorUtility.EntityIdToObject(assetInstanceID) is not UniversalRenderPipelineGlobalSettings asset)
                 return;
 
             int assetVersionBeforeUpgrade = asset.m_AssetVersion;
@@ -111,7 +111,7 @@ namespace UnityEngine.Rendering.Universal
             if (asset.m_AssetVersion < 7)
             {
 #pragma warning disable 618 // Type or member is obsolete
-                if (asset.m_RenderingLayerNames != null)
+                if (asset.m_RenderingLayerNames is { Length: > 0 })
                 {
                     for (int i = 1; i < asset.m_RenderingLayerNames.Length; i++)
                     {
@@ -130,7 +130,6 @@ namespace UnityEngine.Rendering.Universal
                         RenderPipelineEditorUtility.TrySetRenderingLayerName(i, currentLayerName);
                     }
                 }
-
 #pragma warning restore 618 // Type or member is obsolete
                 asset.m_AssetVersion = 7;
             }
@@ -164,7 +163,6 @@ namespace UnityEngine.Rendering.Universal
             MigrateToShaderStrippingSetting(data);
             MigrateToURPShaderStrippingSetting(data);
             MigrateDefaultVolumeProfile(data);
-            MigrateToRenderGraphSettings(data);
         }
 
         private static T GetOrCreateGraphicsSettings<T>(UniversalRenderPipelineGlobalSettings data)
@@ -193,15 +191,6 @@ namespace UnityEngine.Rendering.Universal
             shaderStrippingSetting.shaderVariantLogLevel    = data.m_ShaderStrippingSetting.shaderVariantLogLevel;
             shaderStrippingSetting.exportShaderVariants     = data.m_ShaderStrippingSetting.exportShaderVariants;
             shaderStrippingSetting.stripRuntimeDebugShaders = data.m_ShaderStrippingSetting.stripRuntimeDebugShaders;
-#pragma warning restore 618
-        }
-
-        static void MigrateToRenderGraphSettings(UniversalRenderPipelineGlobalSettings data)
-        {
-            var rgSettings = GetOrCreateGraphicsSettings<RenderGraphSettings>(data);
-
-#pragma warning disable 618 // Type or member is obsolete
-            rgSettings.enableRenderCompatibilityMode = !data.m_EnableRenderGraph;
 #pragma warning restore 618
         }
 
@@ -245,7 +234,7 @@ namespace UnityEngine.Rendering.Universal
             {
                 if (currentInstance != null && !currentInstance.IsAtLastVersion())
                 {
-                    UpgradeAsset(currentInstance.GetInstanceID());
+                    UpgradeAsset(currentInstance.GetEntityId());
                     AssetDatabase.SaveAssetIfDirty(currentInstance);
                 }
 
@@ -313,7 +302,7 @@ namespace UnityEngine.Rendering.Universal
         /// Names used for display of light layers with Layer's index as prefix.
         /// For example: "0: Light Layer Default"
         /// </summary>
-        [Obsolete("This is obsolete, please use prefixedRenderingLayerMaskNames instead.", true)]
+        [Obsolete("This property is obsolete. Use RenderingLayerMask API and Tags & Layers project settings instead.", true)]
         public string[] prefixedLightLayerNames => new string[0];
 
 

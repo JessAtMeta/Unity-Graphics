@@ -1,3 +1,4 @@
+#if !UNITY_WEBGL_RENDERER_ONLY
 using System;
 using UnityEngine.Serialization;
 
@@ -62,7 +63,10 @@ namespace UnityEngine.Rendering
         private void OnValidate()
         {
             OnDisable();
-            OnEnable();
+            if (enabled)
+                OnEnable();
         }
     }
 }
+
+#endif // !UNITY_WEBGL_RENDERER_ONLY

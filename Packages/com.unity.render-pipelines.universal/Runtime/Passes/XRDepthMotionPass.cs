@@ -61,11 +61,10 @@ namespace UnityEngine.Rendering.Universal
             var drawingSettings = new DrawingSettings(k_MotionOnlyShaderTagId, sortingSettings)
             {
                 perObjectData = PerObjectData.MotionVectors,
-                enableDynamicBatching = false,
                 enableInstancing = true,
             };
             drawingSettings.SetShaderPassName(0, k_MotionOnlyShaderTagId);
-            
+
             return drawingSettings;
         }
 
@@ -211,7 +210,7 @@ namespace UnityEngine.Rendering.Universal
                     // Object Motion for both static and dynamic objects, fill stencil for mv filled pixels.
                     context.cmd.DrawRendererList(passData.objMotionRendererList);
 
-                    // Fill mv texturew with camera motion for pixels that don't have mv stencil bit. 
+                    // Fill mv texturew with camera motion for pixels that don't have mv stencil bit.
                     context.cmd.DrawProcedural(Matrix4x4.identity, data.xrMotionVector, 0, MeshTopology.Triangles, 3, 1);
                 });
             }

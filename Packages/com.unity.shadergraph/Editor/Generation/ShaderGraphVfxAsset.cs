@@ -22,8 +22,6 @@ namespace UnityEditor.ShaderGraph.Internal
         public string name;
         public Texture texture;
         public TextureDimension dimension;
-
-        public int instanceID => texture != null ? texture.GetInstanceID() : 0;
     }
 
     public sealed class ShaderGraphVfxAsset : ScriptableObject, ISerializationCallbackReceiver
@@ -97,7 +95,7 @@ namespace UnityEditor.ShaderGraph.Internal
 
         internal void SetTextureInfos(IList<PropertyCollector.TextureInfo> textures)
         {
-            m_TextureInfos = textures.Select(t => new TextureInfo(t.name, EditorUtility.InstanceIDToObject(t.textureId) as Texture, t.dimension)).ToArray();
+            m_TextureInfos = textures.Select(t => new TextureInfo(t.name, EditorUtility.EntityIdToObject(t.textureId) as Texture, t.dimension)).ToArray();
         }
 
         internal void SetOutputs(OutputMetadata[] outputs)
@@ -131,6 +129,11 @@ namespace UnityEditor.ShaderGraph.Internal
         {
             get { return m_OutputStructName; }
             internal set { m_OutputStructName = value; }
+        }
+
+        internal void SetGUID(string guid)
+        {
+            m_Data.OverrideObjectId(guid, "SerializedVfxAssetData");
         }
 
         public List<ShaderInput> properties

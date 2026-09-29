@@ -423,7 +423,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             if (this.GbufferRTHandles != null)
             {
                 // In case DeferredLight does not own the RTHandle, we can skip realloc.
-                if (this.GbufferRTHandles[gbufferIndex].GetInstanceID() != this.GbufferAttachments[gbufferIndex].GetInstanceID())
+                if (this.GbufferRTHandles[gbufferIndex].GetUniqueID() != this.GbufferAttachments[gbufferIndex].GetUniqueID())
                     return;
 
                 gbufferSlice.depthStencilFormat = GraphicsFormat.None; // make sure no depth surface is actually created
@@ -623,7 +623,7 @@ namespace UnityEngine.Rendering.Universal.Internal
             // which prevents from resolving correct pass indices.
             if (m_StencilDeferredPasses[0] < 0)
                 InitStencilDeferredMaterial();
-            
+
             if (!UseFramebufferFetch)
             {
                 for (int i = 0; i < GbufferTextureHandles.Length; i++)

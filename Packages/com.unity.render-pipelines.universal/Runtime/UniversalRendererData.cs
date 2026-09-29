@@ -108,9 +108,9 @@ namespace UnityEngine.Rendering.Universal
     {
 #if UNITY_EDITOR
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1812")]
-        internal class CreateUniversalRendererAsset : EndNameEditAction
+        internal class CreateUniversalRendererAsset : AssetCreationEndAction
         {
-            public override void Action(int instanceId, string pathName, string resourceFile)
+            public override void Action(EntityId entityId, string pathName, string resourceFile)
             {
                 var instance = UniversalRenderPipelineAsset.CreateRendererAsset(pathName, RendererType.UniversalRenderer, false) as UniversalRendererData;
                 Selection.activeObject = instance;
@@ -120,7 +120,7 @@ namespace UnityEngine.Rendering.Universal
         [MenuItem("Assets/Create/Rendering/URP Universal Renderer", priority = CoreUtils.Sections.section3 + CoreUtils.Priorities.assetsCreateRenderingMenuPriority + 2)]
         static void CreateUniversalRendererData()
         {
-            ProjectWindowUtil.StartNameEditingIfProjectWindowExists(0, CreateInstance<CreateUniversalRendererAsset>(), "New Custom Universal Renderer Data.asset", null, null);
+            ProjectWindowUtil.StartNameEditingIfProjectWindowExists(EntityId.None, CreateInstance<CreateUniversalRendererAsset>(), "New Custom Universal Renderer Data.asset", null, null);
         }
 
 #endif
@@ -223,6 +223,13 @@ namespace UnityEngine.Rendering.Universal
                 m_RenderingMode = value;
             }
         }
+
+        /// <summary>
+        /// Returns true if the renderer uses a spatially clustered/tiled light list.
+        /// This is true for the Forward+ and Deferred+ rendering paths.
+        /// Note: DeferredPlus does not exist in this branch; kept in the doc to match upstream.
+        /// </summary>
+        public bool usesClusterLightLoop => m_RenderingMode == RenderingMode.ForwardPlus;
 
         /// <summary>
         /// Depth priming mode.

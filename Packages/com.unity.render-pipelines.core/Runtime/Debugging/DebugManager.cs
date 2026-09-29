@@ -66,6 +66,43 @@ namespace UnityEngine.Rendering
 
         event Action resetData;
 
+        void ForEachWidgetInContainer(DebugUI.Widget widget, Action<DebugUI.Widget> action)
+        {
+            action(widget);
+
+            if (widget is DebugUI.IContainer container)
+            {
+                foreach (var child in container.children)
+                    ForEachWidgetInContainer(child, action);
+            }
+        }
+
+        /// <summary>
+        /// Iterate over all widgets in all panels and invoke the provided action on each widget.
+        /// </summary>
+        /// <param name="action">Action to invoke.</param>
+        internal void ForEachWidget(Action<DebugUI.Widget> action)
+        {
+            foreach (var panel in m_Panels)
+                foreach (var widget in panel.children)
+                    ForEachWidgetInContainer(widget, action);
+        }
+
+        /// <summary>
+        /// Event invoked when debug UI needs to be recreated (panels torn down and rebuilt).
+        /// </summary>
+        internal event Action onRecreateDebugUI;
+
+        /// <summary>
+        /// Recreates the debug UI for all panels. Use this when the panel structure needs to be rebuilt
+        /// (e.g., when widgets need to be added/removed dynamically based on feature availability).
+        /// For simple value refreshes, the UI automatically updates through widget getters.
+        /// </summary>
+        public void RecreateDebugUI()
+        {
+            onRecreateDebugUI?.Invoke();
+        }
+
         /// <summary>
         /// Force an editor request.
         /// </summary>

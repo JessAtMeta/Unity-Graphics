@@ -12,7 +12,7 @@ namespace UnityEditor.ShaderGraph
         public struct TextureInfo
         {
             public string name;
-            public int textureId;
+            public EntityId textureId;
             public TextureDimension dimension;
             public bool modifiable;
         }
@@ -92,11 +92,18 @@ namespace UnityEditor.ShaderGraph
                     {
                         Debug.LogError("Two properties with the same reference name (" + prop.referenceName + ") using different types");
                     }
-                    else
-                    {
-                        if (!EquivalentHLSLProperties(existingProp, prop))
-                            Debug.LogError("Two properties with the same reference name (" + prop.referenceName + ") produce different HLSL properties");
-                    }
+                    // else
+                    // {
+                        // if (!EquivalentHLSLProperties(existingProp, prop))
+                        // {
+                            // NOTE:
+                            // Shader Graph won't produce a duplicate property.
+                            // Since the type is already the same (as per above)
+                            //  and by way of how targets/properties/subshaders work,
+                            // any duplicate properties in SG will just use the same declaration.
+                            // Debug.LogError("Two properties with the same reference name (" + prop.referenceName + ") produce different HLSL properties");
+                        // }
+                    // }
                 }
             }
             else
@@ -259,7 +266,7 @@ namespace UnityEditor.ShaderGraph
                     var textureInfo = new TextureInfo
                     {
                         name = prop.referenceName,
-                        textureId = prop.value.texture != null ? prop.value.texture.GetInstanceID() : 0,
+                        textureId = prop.value.texture != null ? prop.value.texture.GetEntityId() : EntityId.None,
                         dimension = TextureDimension.Tex2D,
                         modifiable = prop.modifiable
                     };
@@ -274,7 +281,7 @@ namespace UnityEditor.ShaderGraph
                     var textureInfo = new TextureInfo
                     {
                         name = prop.referenceName,
-                        textureId = prop.value.textureArray != null ? prop.value.textureArray.GetInstanceID() : 0,
+                        textureId = prop.value.textureArray != null ? prop.value.textureArray.GetEntityId() : EntityId.None,
                         dimension = TextureDimension.Tex2DArray,
                         modifiable = prop.modifiable
                     };
@@ -289,7 +296,7 @@ namespace UnityEditor.ShaderGraph
                     var textureInfo = new TextureInfo
                     {
                         name = prop.referenceName,
-                        textureId = prop.value.texture != null ? prop.value.texture.GetInstanceID() : 0,
+                        textureId = prop.value.texture != null ? prop.value.texture.GetEntityId() : EntityId.None,
                         dimension = TextureDimension.Tex3D,
                         modifiable = prop.modifiable
                     };
@@ -304,7 +311,7 @@ namespace UnityEditor.ShaderGraph
                     var textureInfo = new TextureInfo
                     {
                         name = prop.referenceName,
-                        textureId = prop.value.cubemap != null ? prop.value.cubemap.GetInstanceID() : 0,
+                        textureId = prop.value.cubemap != null ? prop.value.cubemap.GetEntityId() : EntityId.None,
                         dimension = TextureDimension.Cube,
                         modifiable = prop.modifiable
                     };

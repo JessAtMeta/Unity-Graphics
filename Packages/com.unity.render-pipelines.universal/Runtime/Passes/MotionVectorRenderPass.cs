@@ -107,20 +107,19 @@ namespace UnityEngine.Rendering.Universal
             {
                 InitPassData(ref m_PassData, cameraData);
 
-                InitRendererLists(ref m_PassData, ref universalRenderingData.cullResults, universalRenderingData.supportsDynamicBatching,
+                InitRendererLists(ref m_PassData, ref universalRenderingData.cullResults,
                     context, default(RenderGraph), false);
 
                 ExecutePass(cmd, m_PassData, m_PassData.rendererList);
             }
         }
 
-        private static DrawingSettings GetDrawingSettings(Camera camera, bool supportsDynamicBatching)
+        private static DrawingSettings GetDrawingSettings(Camera camera)
         {
             var sortingSettings = new SortingSettings(camera) { criteria = SortingCriteria.CommonOpaque };
             var drawingSettings = new DrawingSettings(ShaderTagId.none, sortingSettings)
             {
                 perObjectData = PerObjectData.MotionVectors,
-                enableDynamicBatching = supportsDynamicBatching,
                 enableInstancing = true,
             };
 
@@ -203,9 +202,9 @@ namespace UnityEngine.Rendering.Universal
             passData.cameraMaterial = m_CameraMaterial;
         }
 
-        private void InitRendererLists(ref PassData passData, ref CullingResults cullResults, bool supportsDynamicBatching, ScriptableRenderContext context, RenderGraph renderGraph, bool useRenderGraph)
+        private void InitRendererLists(ref PassData passData, ref CullingResults cullResults, ScriptableRenderContext context, RenderGraph renderGraph, bool useRenderGraph)
         {
-            var drawingSettings = GetDrawingSettings(passData.camera, supportsDynamicBatching);
+            var drawingSettings = GetDrawingSettings(passData.camera);
             var renderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
             if (useRenderGraph)
                 RenderingUtils.CreateRendererListWithRenderStateBlock(renderGraph, ref cullResults, drawingSettings, m_FilteringSettings, renderStateBlock, ref passData.rendererListHdl);
@@ -236,7 +235,7 @@ namespace UnityEngine.Rendering.Universal
                 passData.cameraDepth = cameraDepthTexture;
                 builder.UseTexture(cameraDepthTexture, AccessFlags.Read);
 
-                InitRendererLists(ref passData, ref renderingData.cullResults, renderingData.supportsDynamicBatching,
+                InitRendererLists(ref passData, ref renderingData.cullResults,
                     default(ScriptableRenderContext), renderGraph, true);
                 builder.UseRendererList(passData.rendererListHdl);
 

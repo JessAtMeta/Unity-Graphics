@@ -749,7 +749,7 @@ namespace UnityEditor.Rendering.Universal
                 var materialIcon = AssetPreview.GetMiniTypeThumbnail(typeof(Material));
                 var action = ScriptableObject.CreateInstance<DoCreateDecalDefaultMaterial>();
                 action.decalProjector = target as DecalProjector;
-                ProjectWindowUtil.StartNameEditingIfProjectWindowExists(0, action, materialName, materialIcon, null);
+                ProjectWindowUtil.StartNameEditingIfProjectWindowExists(EntityId.None, action, materialName, materialIcon, null);
             }
                 
         }

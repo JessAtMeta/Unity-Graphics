@@ -126,7 +126,7 @@ namespace UnityEngine.Rendering
             if (Is2D(texture))
             {
                 Blit2DTexture(cmd, scaleOffset, texture, sourceScaleOffset, blitMips, BlitType.Padding);
-                MarkGPUTextureValid(overrideInstanceID != -1 ? overrideInstanceID : texture.GetInstanceID(), blitMips);
+                MarkGPUTextureValid(overrideInstanceID != -1 ? overrideInstanceID : texture.GetEntityId().GetHashCode(), blitMips);
             }
         }
 
@@ -144,8 +144,8 @@ namespace UnityEngine.Rendering
             // We handle ourself the 2D blit because cookies needs mipPadding for trilinear filtering
             if (Is2D(texture))
             {
-                Blit2DTexture(cmd, scaleOffset, texture, sourceScaleOffset, blitMips, BlitType.PaddingMultiply);
-                MarkGPUTextureValid(overrideInstanceID != -1 ? overrideInstanceID : texture.GetInstanceID(), blitMips);
+Blit2DTexture(cmd, scaleOffset, texture, sourceScaleOffset, blitMips, BlitType.PaddingMultiply);
+                MarkGPUTextureValid(overrideInstanceID != -1 ? overrideInstanceID : texture.GetEntityId().GetHashCode(), blitMips);
             }
         }
 
@@ -163,8 +163,8 @@ namespace UnityEngine.Rendering
             // We handle ourself the 2D blit because cookies needs mipPadding for trilinear filtering
             if (Is2D(texture))
             {
-                Blit2DTexture(cmd, scaleOffset, texture, sourceScaleOffset, blitMips, BlitType.OctahedralPadding);
-                MarkGPUTextureValid(overrideInstanceID != -1 ? overrideInstanceID : texture.GetInstanceID(), blitMips);
+Blit2DTexture(cmd, scaleOffset, texture, sourceScaleOffset, blitMips, BlitType.OctahedralPadding);
+                MarkGPUTextureValid(overrideInstanceID != -1 ? overrideInstanceID : texture.GetEntityId().GetHashCode(), blitMips);
             }
         }
 
@@ -182,8 +182,8 @@ namespace UnityEngine.Rendering
             // We handle ourself the 2D blit because cookies needs mipPadding for trilinear filtering
             if (Is2D(texture))
             {
-                Blit2DTexture(cmd, scaleOffset, texture, sourceScaleOffset, blitMips, BlitType.OctahedralPaddingMultiply);
-                MarkGPUTextureValid(overrideInstanceID != -1 ? overrideInstanceID : texture.GetInstanceID(), blitMips);
+Blit2DTexture(cmd, scaleOffset, texture, sourceScaleOffset, blitMips, BlitType.OctahedralPaddingMultiply);
+                MarkGPUTextureValid(overrideInstanceID != -1 ? overrideInstanceID : texture.GetEntityId().GetHashCode(), blitMips);
             }
         }
 

@@ -57,7 +57,7 @@ namespace UnityEngine.Rendering
     public class CurrentPipelineHelpURLAttribute : HelpURLAttribute
     {
         private string pageName { get; }
-        
+
         private string pageHash { get; }
         /// <summary>
         /// The constructor of the attribute
@@ -86,6 +86,36 @@ namespace UnityEngine.Rendering
 #endif
                 return string.Empty;
             }
+        }
+    }
+
+    /// <summary>
+    /// Use this attribute to define a documentation URL that is only active when a specific Render Pipeline is in use.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// [PipelineHelpURL("HDRenderPipelineAsset", "hdrp-page-name")]
+    /// [PipelineHelpURL("UniversalRenderPipelineAsset", "urp-page-name")]
+    /// public class MyHDRPComponent : MonoBehaviour { /* ... */ }
+    /// </code>
+    /// </example>
+    /// <remarks>
+    /// The URL will only be generated if the active Scriptable Render Pipeline Asset's type name exactly matches the <c>pipelineName</c> provided.
+    /// </remarks>
+    /// <seealso cref="HelpURLAttribute"/>
+    [Conditional("UNITY_EDITOR")]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Enum, AllowMultiple = true)]
+    public class PipelineHelpURLAttribute : HelpURLAttribute
+    {
+        /// <summary>
+        /// Initializes the attribute to link to a specific documentation page for a named Render Pipeline.
+        /// </summary>
+        /// <param name="pipelineName">The exact Type name of the Render Pipeline Asset for which this URL is valid.</param>
+        /// <param name="pageName">The name of the documentation page.</param>
+        /// <param name="pageHash">Optional. The specific section anchor (#) on the documentation page.</param>
+        public PipelineHelpURLAttribute(string pipelineName, string pageName, string pageHash = "")
+            : base(null)
+        {
         }
     }
 
@@ -122,7 +152,7 @@ namespace UnityEngine.Rendering
         /// <param name="pageName">The page name without the extension.</param>
         /// <returns>The full URL of the page.</returns>
         public static string GetPackageLink(string packageName, string packageVersion, string pageName) => string.Format(url, packageName, packageVersion, pageName, "");
-        
+
         /// <summary>
         /// Generates a help URL for the given package, page name and section name.
         /// </summary>

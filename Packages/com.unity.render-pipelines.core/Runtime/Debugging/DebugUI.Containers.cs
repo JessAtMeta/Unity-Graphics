@@ -178,6 +178,11 @@ namespace UnityEngine.Rendering
             /// </summary>
             public List<ContextMenuItem> contextMenuItems = null;
 
+            /// <summary>
+            /// Optional help URL for the editor UI
+            /// </summary>
+            public string documentationUrl { get; set; }
+
             private bool m_Dirty;
             private string[] m_ColumnLabels;
             private string[] m_ColumnTooltips;
@@ -347,6 +352,11 @@ namespace UnityEngine.Rendering
             /// True if the table is read only.
             /// </summary>
             public bool isReadOnly = false;
+
+            /// <summary>
+            /// Set to false to hide the first column containing the row names
+            /// </summary>
+            public bool displayRowNames = true;
 
             /// <summary>Constructor.</summary>
             public Table() { displayName = "Array"; }

@@ -203,15 +203,29 @@ namespace UnityEngine.Rendering
         }
 
         /// <summary>
+        /// Get the unique identifier of the RTHandle.
+        /// </summary>
+        /// <returns>The RTHandle identifier.</returns>
+        public ulong GetUniqueID()
+        {
+            if (m_RT != null)
+                return EntityId.ToULong(m_RT.GetEntityId());
+            else if (m_ExternalTexture != null)
+                return EntityId.ToULong(m_ExternalTexture.GetEntityId());
+            else
+                return (ulong)m_NameID.GetHashCode(); // No instance ID so we return the hash code.
+        }
+
+        /// <summary>
         /// Get the Instance ID of the RTHandle.
         /// </summary>
         /// <returns>The RTHandle Instance ID.</returns>
         public int GetInstanceID()
         {
             if (m_RT != null)
-                return m_RT.GetInstanceID();
+                return m_RT.GetEntityId().GetHashCode();
             else if (m_ExternalTexture != null)
-                return m_ExternalTexture.GetInstanceID();
+                return m_ExternalTexture.GetEntityId().GetHashCode();
             else
                 return m_NameID.GetHashCode(); // No instance ID so we return the hash code.
         }
