@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using UnityEngine.Assemblies;
 using UnityEngine.Experimental.Rendering;
 
 namespace UnityEngine.Rendering
@@ -1273,7 +1274,11 @@ namespace UnityEngine.Rendering
         {
             if (m_AssemblyTypes == null)
             {
+#if UNITY_6000_5_OR_NEWER
+                m_AssemblyTypes = CurrentAssemblies.GetLoadedAssemblies()
+#else
                 m_AssemblyTypes = AppDomain.CurrentDomain.GetAssemblies()
+#endif
                     .SelectMany(t =>
                     {
                         // Ugly hack to handle mis-versioned dlls
