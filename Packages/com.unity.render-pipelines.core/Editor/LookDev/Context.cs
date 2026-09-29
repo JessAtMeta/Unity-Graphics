@@ -468,7 +468,7 @@ namespace UnityEditor.Rendering.LookDev
         }
 
         internal void CleanTemporaryObjectIndexes()
-            => viewedObjecHierarchytEntityId = 0;
+            => viewedObjecHierarchytEntityId = EntityId.None;
 
         /// <summary>Reset the camera state to default values</summary>
         public void ResetCameraState()
