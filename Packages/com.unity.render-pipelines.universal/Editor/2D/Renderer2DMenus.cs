@@ -19,11 +19,11 @@ namespace UnityEditor.Rendering.Universal
             ProjectWindowUtil.StartNameEditingIfProjectWindowExists(EntityId.None, instance, "New 2D Renderer Data.asset", null, null);
         }
 
-        class Create2DRendererDataAsset : EndNameEditAction
+        class Create2DRendererDataAsset : AssetCreationEndAction
         {
             public event Action<Renderer2DData> onCreated;
 
-            public override void Action(int instanceId, string pathName, string resourceFile)
+            public override void Action(EntityId entityId, string pathName, string resourceFile)
             {
                 var instance = CreateRendererAsset(pathName, RendererType._2DRenderer, false) as Renderer2DData;
                 Selection.activeObject = instance;
@@ -186,9 +186,9 @@ namespace UnityEditor.Rendering.Universal
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1812")]
-        internal class CreateUniversalPipelineAsset : EndNameEditAction
+        internal class CreateUniversalPipelineAsset : AssetCreationEndAction
         {
-            public override void Action(int instanceId, string pathName, string resourceFile)
+            public override void Action(EntityId entityId, string pathName, string resourceFile)
             {
                 //Create asset
                 AssetDatabase.CreateAsset(UniversalRenderPipelineAsset.Create(CreateRendererAsset(pathName, RendererType._2DRenderer)), pathName);
