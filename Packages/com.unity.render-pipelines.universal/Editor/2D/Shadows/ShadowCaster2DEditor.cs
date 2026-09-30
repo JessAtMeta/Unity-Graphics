@@ -68,7 +68,7 @@ namespace UnityEditor.Rendering.Universal
         SerializedProperty m_ShadowShape2DProvider;
         SortingLayerDropDown m_SortingLayerDropDown;
         CastingSourceDropDown m_CastingSourceDropDown;
-       
+
 
         public void OnEnable()
         {
