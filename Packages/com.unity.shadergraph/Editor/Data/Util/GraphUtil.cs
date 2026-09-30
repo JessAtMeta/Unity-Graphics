@@ -99,7 +99,7 @@ namespace UnityEditor.ShaderGraph
         }
     }
 
-    class NewGraphAction : EndNameEditAction
+    class NewGraphAction : AssetCreationEndAction
     {
         Target[] m_Targets;
         public Target[] targets
@@ -115,7 +115,7 @@ namespace UnityEditor.ShaderGraph
             set => m_Blocks = value;
         }
 
-        public override void Action(int instanceId, string pathName, string resourceFile)
+        public override void Action(EntityId entityId, string pathName, string resourceFile)
         {
             var graph = new GraphData();
             graph.AddContexts();

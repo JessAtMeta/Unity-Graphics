@@ -1,15 +1,12 @@
+using System;
 using System.Collections.Generic;
-using UnityEditor.ShaderGraph.Drawing;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace UnityEditor.ShaderGraph.Drawing
 {
-    [System.Obsolete("ResizableElementFactory is deprecated and will be removed. Use UxmlElementAttribute instead.", false)]
-    class ResizableElementFactory : UxmlFactory<ResizableElement>
-    { }
-
-    class ResizableElement : VisualElement
+    [UxmlElement]
+    partial class ResizableElement : VisualElement
     {
         Dictionary<Resizer, VisualElement> m_Resizers = new Dictionary<Resizer, VisualElement>();
 
@@ -72,6 +69,7 @@ namespace UnityEditor.ShaderGraph.Drawing
             }
         }
 
+        [Flags]
         public enum Resizer
         {
             None = 0,
