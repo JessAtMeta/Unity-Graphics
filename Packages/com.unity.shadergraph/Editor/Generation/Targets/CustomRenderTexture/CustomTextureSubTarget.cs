@@ -22,7 +22,7 @@ namespace UnityEditor.Rendering.CustomRenderTexture.ShaderGraph
 
         public override void Setup(ref TargetSetupContext context)
         {
-            context.AddAssetDependency(new GUID(kAssetGuid), AssetCollection.Flags.SourceDependency);
+            context.AddAssetDependency(new UnityEngine.GUID(kAssetGuid), AssetCollection.Flags.SourceDependency);
             context.AddSubShader(SubShaders.CustomRenderTexture);
         }
 

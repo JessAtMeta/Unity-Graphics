@@ -7,14 +7,19 @@ using UnityEngine;
 using UnityEditor.Graphing;
 using Object = UnityEngine.Object;
 using UnityEditor.Experimental.GraphView;
+using Unity.GraphAuthoring.Editor.ProviderSystem;
 using UnityEditor.ShaderGraph.Drawing.Inspector.PropertyDrawers;
 using UnityEditor.ShaderGraph.Drawing.Views;
 using UnityEditor.ShaderGraph.Internal;
 using UnityEditor.ShaderGraph.Serialization;
 using UnityEngine.UIElements;
 using Edge = UnityEditor.Experimental.GraphView.Edge;
+#if UNITY_6000_5_OR_NEWER
+using UnityEngine.Assemblies;
+#endif
 using Node = UnityEditor.Experimental.GraphView.Node;
 using UnityEngine.Pool;
+using UnityEditor.ShaderGraph.Legacy;
 
 namespace UnityEditor.ShaderGraph.Drawing
 {
@@ -38,7 +43,11 @@ namespace UnityEditor.ShaderGraph.Drawing
 
             // Get reference to GraphView assembly
             Assembly graphViewAssembly = null;
+#if UNITY_6000_5_OR_NEWER
+            foreach (var assembly in CurrentAssemblies.GetLoadedAssemblies())
+#else
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+#endif
             {
                 var assemblyName = assembly.GetName().ToString();
                 if (assemblyName.Contains("GraphView"))
@@ -63,6 +72,7 @@ namespace UnityEditor.ShaderGraph.Drawing
         Vector3 lkgScale;
         void OnTransformChanged(GraphView graphView)
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             if (!graphView.viewTransform.position.Equals(Vector3.zero))
             {
                 lkgPosition = graphView.viewTransform.position;
@@ -72,6 +82,7 @@ namespace UnityEditor.ShaderGraph.Drawing
             {
                 graphView.UpdateViewTransform(lkgPosition, lkgScale);
             }
+#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         protected internal override bool canCutSelection
@@ -117,7 +128,7 @@ namespace UnityEditor.ShaderGraph.Drawing
             m_InspectorUpdateDelegate = inspectorUpdateDelegate;
             if (propertyDrawer is GraphDataPropertyDrawer graphDataPropertyDrawer)
             {
-                graphDataPropertyDrawer.GetPropertyData(this.ChangeTargetSettings, ChangePrecision);
+                graphDataPropertyDrawer.GetPropertyData(this.ChangeTargetSettings, ChangeGraphSettings, ChangePrecision);
             }
         }
 
@@ -129,7 +140,15 @@ namespace UnityEditor.ShaderGraph.Drawing
                 graph.AddRemoveBlocksFromActiveList(activeBlocks);
             }
 
+            graph.RefreshBadgesAndPreviews();
             graph.UpdateActiveBlocks(activeBlocks);
+            this.m_PreviewManagerUpdateDelegate();
+            this.m_InspectorUpdateDelegate();
+        }
+
+        void ChangeGraphSettings()
+        {
+            graph.RefreshBadgesAndPreviews();
             this.m_PreviewManagerUpdateDelegate();
             this.m_InspectorUpdateDelegate();
         }
@@ -328,6 +347,21 @@ namespace UnityEditor.ShaderGraph.Drawing
                     evt.menu.AppendSeparator();
                     evt.menu.AppendAction("Open Sub Graph", OpenSubGraph, (a) => DropdownMenuAction.Status.Normal);
                 }
+                if (selection.OfType<IShaderNodeView>().Count() == 1
+                    && selection.OfType<IShaderNodeView>().First().node is ProviderSystem.ProviderNode providerNode
+                    && providerNode.isValid
+                    && (providerNode.Provider?.IsValid ?? false)
+                    && providerNode.Provider.AssetID != default)
+                {
+                    evt.menu.AppendSeparator();
+
+                    void PingSource(DropdownMenuAction action)
+                    {
+                        var asset = AssetDatabase.LoadAssetByGUID<Object>(providerNode.Provider.AssetID);
+                        EditorGUIUtility.PingObject(asset);
+                    }
+                    evt.menu.AppendAction("Show Source in Project", PingSource, (a) => DropdownMenuAction.Status.Normal);
+                }
             }
             evt.menu.AppendSeparator();
             if (evt.target is StickyNote)
@@ -413,8 +447,8 @@ namespace UnityEditor.ShaderGraph.Drawing
             // We can manually add them back in here (although the context menu ordering is different).
             if (evt.target is StickyNote)
             {
-                evt.menu.AppendAction("Copy %d", (e) => CopySelectionCallback(), (a) => canCopySelection ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
-                evt.menu.AppendAction("Cut %d", (e) => CutSelectionCallback(), (a) => canCutSelection ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
+                evt.menu.AppendAction("Copy %c", (e) => CopySelectionCallback(), (a) => canCopySelection ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
+                evt.menu.AppendAction("Cut %x", (e) => CutSelectionCallback(), (a) => canCutSelection ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
                 evt.menu.AppendAction("Duplicate %d", (e) => DuplicateSelectionCallback(), (a) => canDuplicateSelection ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
             }
 
@@ -502,7 +536,7 @@ namespace UnityEditor.ShaderGraph.Drawing
         }
 
         // Replicating these private GraphView functions as we need them for our own purposes
-        internal void AddToSelectionNoUndoRecord(GraphElement graphElement)
+        internal new void AddToSelectionNoUndoRecord(GraphElement graphElement)
         {
             graphElement.selected = true;
             selection.Add(graphElement);
@@ -551,7 +585,7 @@ namespace UnityEditor.ShaderGraph.Drawing
             OnSelectionChange?.Invoke(selection);
         }
 
-        internal bool ClearSelectionNoUndoRecord()
+        internal new bool ClearSelectionNoUndoRecord()
         {
             foreach (var graphElement in selection.OfType<GraphElement>())
             {
@@ -573,7 +607,9 @@ namespace UnityEditor.ShaderGraph.Drawing
         {
             graph.owner.RegisterCompleteObjectUndo("Delete Group and Contents");
             var groupItems = graph.GetItemsInGroup(data);
-            graph.RemoveElements(groupItems.OfType<AbstractMaterialNode>().ToArray(), new IEdge[] { }, new[] { data }, groupItems.OfType<StickyNoteData>().ToArray());
+            // Skip undeletable nodes (e.g. SubGraphOutputNode, master output) — RemoveElements throws on them.
+            var nodesToDelete = groupItems.OfType<AbstractMaterialNode>().Where(n => n.canDeleteNode).ToArray();
+            graph.RemoveElements(nodesToDelete, new IEdge[] { }, new[] { data }, groupItems.OfType<StickyNoteData>().ToArray());
         }
 
         private void InitializePrecisionSubMenu(ContextualMenuPopulateEvent evt)
@@ -654,15 +690,6 @@ namespace UnityEditor.ShaderGraph.Drawing
 
         void ChangeCustomNodeColor(DropdownMenuAction menuAction)
         {
-            // Color Picker is internal :(
-            var t = typeof(EditorWindow).Assembly.GetTypes().FirstOrDefault(ty => ty.Name == "ColorPicker");
-            var m = t?.GetMethod("Show", new[] { typeof(Action<Color>), typeof(Color), typeof(bool), typeof(bool) });
-            if (m == null)
-            {
-                Debug.LogWarning("Could not invoke Color Picker for ShaderGraph.");
-                return;
-            }
-
             var editorView = GetFirstAncestorOfType<GraphEditorView>();
             var defaultColor = Color.gray;
             if (selection.FirstOrDefault(sel => sel is MaterialNodeView) is MaterialNodeView selNode1)
@@ -684,7 +711,7 @@ namespace UnityEditor.ShaderGraph.Drawing
             }
 
             graph.owner.RegisterCompleteObjectUndo("Change Node Color");
-            m.Invoke(null, new object[] { (Action<Color>)ApplyColor, defaultColor, true, false });
+            ColorPicker.Show(ApplyColor, defaultColor, true, false);
         }
 
         protected internal override bool canDeleteSelection
@@ -965,7 +992,8 @@ namespace UnityEditor.ShaderGraph.Drawing
 
         bool CanPasteSerializedDataImplementation(string serializedData)
         {
-            return CopyPasteGraph.FromJson(serializedData, graph) != null;
+            var json = CopyPasteGraph.FromJson(serializedData, graph);
+            return json != null && !json.IsEmpty();
         }
 
         void UnserializeAndPasteImplementation(string operationName, string serializedData)
@@ -1197,6 +1225,7 @@ namespace UnityEditor.ShaderGraph.Drawing
                 {
                     if (ValidateObjectForDrop(obj))
                     {
+                        DragAndDrop.AcceptDrag();
                         CreateNode(obj, localPos);
                     }
                 }
@@ -1498,16 +1527,6 @@ namespace UnityEditor.ShaderGraph.Drawing
                     );
 
                     graphView.graph.PasteGraph(copyGraph, remappedNodes, remappedEdges);
-
-                    // Add new elements to selection
-                    graphView.graphElements.ForEach(element =>
-                    {
-                        if (element is Edge edge && remappedEdges.Contains(edge.userData as IEdge))
-                            graphView.AddToSelection(edge);
-
-                        if (element is IShaderNodeView nodeView && remappedNodes.Contains(nodeView.node))
-                            graphView.AddToSelection((Node)nodeView);
-                    });
                 }
             }
         }
