@@ -1,22 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.Assemblies;
 using UnityEditor.Graphing;
 using UnityEditor.Graphing.Util;
-using UnityEditor.ShaderGraph.Drawing.Interfaces;
+using UnityEditor.ShaderGraph.Internal;
 using Object = UnityEngine.Object;
-#if UNITY_6000_5_OR_NEWER
-using UnityEngine.Assemblies;
-#endif
 
 using UnityEditor.UIElements;
 using UnityEngine.UIElements;
+using UnityEngine.UIElements.StyleSheets;
+using UnityEditor.SearchService;
 
 namespace UnityEditor.ShaderGraph.Drawing.Inspector
 {
-    class MasterPreviewView : VisualElement, ISGResizable
+    class MasterPreviewView : VisualElement
     {
         PreviewManager m_PreviewManager;
         GraphData m_Graph;
@@ -34,7 +35,14 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
 
         Mesh m_PreviousMesh;
 
-        ResizableElement m_ResizableElement;
+        bool m_RecalculateLayout;
+
+        ResizeBorderFrame m_PreviewResizeBorderFrame;
+
+        public ResizeBorderFrame previewResizeBorderFrame
+        {
+            get { return m_PreviewResizeBorderFrame; }
+        }
 
         VisualElement m_Preview;
         Label m_Title;
@@ -45,14 +53,20 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
         }
 
         List<string> m_DoNotShowPrimitives = new List<string>(new string[] { PrimitiveType.Plane.ToString() });
+#if UNITY_6000_5_OR_NEWER
+        static Type s_ContextualMenuManipulator = CurrentAssemblies.GetLoadedAssemblies().SelectMany(x => x.GetTypesOrNothing()).FirstOrDefault(t => t.FullName == "UnityEngine.UIElements.ContextualMenuManipulator");
+        static Type s_ObjectSelector = CurrentAssemblies.GetLoadedAssemblies().SelectMany(x => x.GetTypesOrNothing()).FirstOrDefault(t => t.FullName == "UnityEditor.ObjectSelector");
+#else
+        static Type s_ContextualMenuManipulator = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypesOrNothing()).FirstOrDefault(t => t.FullName == "UnityEngine.UIElements.ContextualMenuManipulator");
+        static Type s_ObjectSelector = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypesOrNothing()).FirstOrDefault(t => t.FullName == "UnityEditor.ObjectSelector");
+#endif
+
 
         public string assetName
         {
             get { return m_Title.text; }
             set { m_Title.text = value; }
         }
-
-        public Action onResized;
 
         public MasterPreviewView(PreviewManager previewManager, GraphData graph)
         {
@@ -68,9 +82,6 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
                 m_PreviewRenderHandle.onPreviewChanged += OnPreviewChanged;
             }
 
-            var mainContainer = new VisualElement();
-            mainContainer.AddToClassList("mainContainer");
-
             var topContainer = new VisualElement() { name = "top" };
             {
                 m_Title = new Label() { name = "title" };
@@ -78,7 +89,7 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
 
                 topContainer.Add(m_Title);
             }
-            mainContainer.Add(topContainer);
+            Add(topContainer);
 
             m_Preview = new VisualElement { name = "middle" };
             {
@@ -87,14 +98,14 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
                 preview.Add(m_PreviewTextureView);
                 preview.AddManipulator(new Scrollable(OnScroll));
             }
-            mainContainer.Add(preview);
+            Add(preview);
 
-            Add(mainContainer);
+            m_PreviewResizeBorderFrame = new ResizeBorderFrame(this, this) { name = "resizeBorderFrame" };
+            m_PreviewResizeBorderFrame.maintainAspectRatio = true;
+            Add(m_PreviewResizeBorderFrame);
 
-            m_ResizableElement = new ResizableElement();
-            Add(m_ResizableElement);
-
-            RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
+            m_RecalculateLayout = false;
+            this.RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
         }
 
         Image CreatePreview(Texture texture)
@@ -106,35 +117,21 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
 
             var image = new Image { name = "preview", image = texture, scaleMode = ScaleMode.ScaleAndCrop };
             image.AddManipulator(new Draggable(OnMouseDragPreviewMesh, true));
-            image.AddManipulator(new MasterPreviewManipulator((Action<ContextualMenuPopulateEvent>)BuildContextualMenu));
+            image.AddManipulator((IManipulator)Activator.CreateInstance(s_ContextualMenuManipulator, (Action<ContextualMenuPopulateEvent>)BuildContextualMenu));
             return image;
         }
 
         void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
-            Target currentMainTarget = null;
-            if (m_Graph != null)
-            {
-                foreach (var target in m_Graph.activeTargets)
-                {
-                    currentMainTarget = target;
-                    break;
-                }
-            }
-            bool prefersUITK = currentMainTarget?.prefersUITKPreview ?? false;
-
-            DropdownMenuAction.Status EnabledIfNotPreferUITK(DropdownMenuAction a)
-                => prefersUITK ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal;
-
             foreach (var primitiveTypeName in Enum.GetNames(typeof(PrimitiveType)))
             {
                 if (m_DoNotShowPrimitives.Contains(primitiveTypeName))
                     continue;
-                evt.menu.AppendAction(primitiveTypeName, e => ChangePrimitiveMesh(primitiveTypeName), EnabledIfNotPreferUITK);
+                evt.menu.AppendAction(primitiveTypeName, e => ChangePrimitiveMesh(primitiveTypeName), DropdownMenuAction.AlwaysEnabled);
             }
 
-            evt.menu.AppendAction("Sprite", e => ChangeMeshSprite(), EnabledIfNotPreferUITK);
-            evt.menu.AppendAction("Custom Mesh", e => ChangeMeshCustom(), EnabledIfNotPreferUITK);
+            evt.menu.AppendAction("Sprite", e => ChangeMeshSprite(), DropdownMenuAction.AlwaysEnabled);
+            evt.menu.AppendAction("Custom Mesh", e => ChangeMeshCustom(), DropdownMenuAction.AlwaysEnabled);
         }
 
         void OnPreviewChanged()
@@ -170,6 +167,12 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
             m_Graph.previewData.serializedMesh.mesh = changedMesh;
         }
 
+        private static EditorWindow Get()
+        {
+            PropertyInfo P = s_ObjectSelector.GetProperty("get", BindingFlags.Public | BindingFlags.Static);
+            return P.GetValue(null, null) as EditorWindow;
+        }
+
         void OnMeshChanged(Object obj)
         {
             var mesh = obj as Mesh;
@@ -188,11 +191,22 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
 
         void ChangeMeshCustom()
         {
-            InternalBridge.ObjectSelector.Show(null, typeof(Mesh), null, false, null, (Action<Object>)OnMeshChanged, (Action<Object>)OnMeshChanged, false);
+            var ShowMethod = s_ObjectSelector.GetMethod("Show", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(UnityEngine.Object), typeof(Type), typeof(UnityEngine.Object), typeof(bool), typeof(List<int>), typeof(Action<UnityEngine.Object>), typeof(Action<UnityEngine.Object>), typeof(bool) }, new ParameterModifier[8]);
+            m_PreviousMesh = m_Graph.previewData.serializedMesh.mesh;
+            ShowMethod.Invoke(Get(), new object[] { null, typeof(Mesh), null, false, null, (Action<Object>)OnMeshChanged, (Action<Object>)OnMeshChanged, false });
         }
 
         void OnGeometryChanged(GeometryChangedEvent evt)
         {
+            if (m_RecalculateLayout)
+            {
+                WindowDockingLayout dockingLayout = new WindowDockingLayout();
+                dockingLayout.CalculateDockingCornerAndOffset(layout, parent.layout);
+                dockingLayout.ClampToParentWindow();
+                dockingLayout.ApplyPosition(this);
+                m_RecalculateLayout = false;
+            }
+
             var currentWidth = m_PreviewRenderHandle?.texture != null ? m_PreviewRenderHandle.texture.width : -1;
             var currentHeight = m_PreviewRenderHandle?.texture != null ? m_PreviewRenderHandle.texture.height : -1;
 
@@ -203,10 +217,7 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
                 return;
 
             m_PreviewTextureView.style.width = evt.newRect.width;
-
-            const float offsetFromHeader = 40.0f;
-            const float offsetFromMargin = 2 * 6.0f;
-            m_PreviewTextureView.style.height = evt.newRect.height - (offsetFromHeader + offsetFromMargin);
+            m_PreviewTextureView.style.height = evt.newRect.height - 40.0f;
             m_PreviewManager.ResizeMasterPreview(new Vector2(evt.newRect.width, evt.newRect.width));
         }
 
@@ -231,17 +242,5 @@ namespace UnityEditor.ShaderGraph.Drawing.Inspector
 
             m_PreviewManager.UpdateMasterPreview(ModificationScope.Node);
         }
-
-        public void OnStartResize()
-        {
-        }
-
-        public void OnResized()
-        {
-            onResized?.Invoke();
-        }
-
-        public bool CanResizePastParentBounds() => false;
-        public bool KeepSquareAspect() => true;
     }
 }

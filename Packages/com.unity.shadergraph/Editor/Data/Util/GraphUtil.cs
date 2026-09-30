@@ -13,11 +13,9 @@ using Debug = UnityEngine.Debug;
 using System.Reflection;
 using System.Runtime.Remoting.Metadata.W3cXsd2001;
 using UnityEditor.ProjectWindowCallback;
-#if UNITY_6000_5_OR_NEWER
-using UnityEngine.Assemblies;
-#endif
 using UnityEditor.ShaderGraph.Internal;
 using UnityEngine;
+using UnityEngine.Assemblies;
 using UnityEngine.Rendering;
 using Object = System.Object;
 
@@ -118,8 +116,6 @@ namespace UnityEditor.ShaderGraph
             set => m_Blocks = value;
         }
 
-        public Action<string> callback { get; set; }
-
         public override void Action(EntityId entityId, string pathName, string resourceFile)
         {
             var graph = new GraphData();
@@ -133,78 +129,6 @@ namespace UnityEditor.ShaderGraph
 
             UnityEngine.Object obj = AssetDatabase.LoadAssetAtPath<Shader>(pathName);
             Selection.activeObject = obj;
-
-            if (ShaderGraphPreferences.GetOrPromptOpenNewGraphOnCreation())
-                AssetDatabase.OpenAsset(obj);
-
-            callback?.Invoke(pathName);
-        }
-    }
-
-    class NewGraphFromTemplateAction : AssetCreationEndAction
-    {
-        string TemplatePath { get; set; }
-
-        public string Filename { get; set; } = "New Shader Graph";
-
-        public Action<string> Callback { get; set; }
-
-        public void CreateAndRenameGraphFromTemplate(string templatePath, string assetPath)
-        {
-            if (templatePath == null) // Template creation canceled
-            {
-                Callback?.Invoke(null);
-                return;
-            }
-
-            TemplatePath = templatePath;
-            AssetCreationEndAction endNameEditAction = this;
-
-            if (templatePath == string.Empty) // Template browser's "empty template" used
-            {
-                NewGraphAction graphItem = ScriptableObject.CreateInstance<NewGraphAction>();
-                graphItem.targets = null;
-                graphItem.callback = Callback;
-                endNameEditAction = graphItem;
-            }
-
-            if (assetPath == null) // template window didn't not provide a target path
-            {
-                ProjectWindowUtil.StartNameEditingIfProjectWindowExists(
-                    EntityId.None,
-                    endNameEditAction,
-                    $"{Filename}.{ShaderGraphImporter.Extension}",
-                    ShaderGraphImporter.GetIcon(),
-                    null
-                );
-            }
-            else
-            {
-                endNameEditAction.Action(EntityId.None, assetPath, "");
-            }
-        }
-
-        public override void Action(EntityId entityId, string pathName, string resourceFile)
-        {
-            var templateFullPath = Path.GetFullPath(TemplatePath);
-            if (File.Exists(templateFullPath))
-            {
-                // Copy the file manually because we do not want any of the template metadata.
-                var templateString = FileUtilities.ReadAllTextUTF8(templateFullPath);
-                File.WriteAllText(pathName, templateString);
-            }
-            else
-            {
-                Debug.LogError($"Could not find template at '{templateFullPath}'");
-                return;
-            }
-
-            AssetDatabase.ImportAsset(pathName);
-
-            if (ShaderGraphPreferences.GetOrPromptOpenNewGraphOnCreation())
-                AssetDatabase.OpenAsset(AssetDatabase.LoadAssetAtPath<Shader>(pathName));
-
-            Callback?.Invoke(pathName);
         }
     }
 
@@ -260,14 +184,12 @@ namespace UnityEditor.ShaderGraph
             return newText.ToString();
         }
 
-        static string GetDefaultNewAssetName() => $"New Shader Graph.{ShaderGraphImporter.Extension}";
-
         public static void CreateNewGraph()
         {
             var graphItem = ScriptableObject.CreateInstance<NewGraphAction>();
             graphItem.targets = null;
             ProjectWindowUtil.StartNameEditingIfProjectWindowExists(EntityId.None, graphItem,
-                string.Format("New Shader Graph.{0}", ShaderGraphImporter.Extension), ShaderGraphImporter.GetIcon(), null);
+                string.Format("New Shader Graph.{0}", ShaderGraphImporter.Extension), null, null);
         }
 
         public static void CreateNewGraphWithOutputs(Target[] targets, BlockFieldDescriptor[] blockDescriptors)
@@ -276,7 +198,7 @@ namespace UnityEditor.ShaderGraph
             graphItem.targets = targets;
             graphItem.blocks = blockDescriptors;
             ProjectWindowUtil.StartNameEditingIfProjectWindowExists(EntityId.None, graphItem,
-                string.Format("New Shader Graph.{0}", ShaderGraphImporter.Extension), ShaderGraphImporter.GetIcon(), null);
+                string.Format("New Shader Graph.{0}", ShaderGraphImporter.Extension), null, null);
         }
 
         public static bool TryGetMetadataOfType<T>(this Shader shader, out T obj) where T : ScriptableObject
@@ -339,10 +261,10 @@ namespace UnityEditor.ShaderGraph
             if (s_LegacyTypeRemapping == null)
             {
                 s_LegacyTypeRemapping = new Dictionary<SerializationHelper.TypeSerializationInfo, SerializationHelper.TypeSerializationInfo>();
-#if UNITY_6000_5_OR_NEWER
-                foreach (var assembly in CurrentAssemblies.GetLoadedAssemblies())
+    #if UNITY_6000_5_OR_NEWER
+            foreach (var assembly in CurrentAssemblies.GetLoadedAssemblies())
 #else
-                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
 #endif
                 {
                     foreach (var type in assembly.GetTypesOrNothing())

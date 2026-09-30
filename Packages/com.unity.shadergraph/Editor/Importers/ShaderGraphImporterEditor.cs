@@ -1,8 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor.Callbacks;
+#if UNITY_2020_2_OR_NEWER
 using UnityEditor.AssetImporters;
+#else
+using UnityEditor.Experimental.AssetImporters;
+#endif
 using UnityEditor.ShaderGraph.Drawing;
 using UnityEngine;
 using UnityEditor.Graphing;
@@ -14,19 +17,14 @@ namespace UnityEditor.ShaderGraph
     [CustomEditor(typeof(ShaderGraphImporter))]
     class ShaderGraphImporterEditor : ScriptedImporterEditor
     {
+        protected override bool needsApplyRevert => false;
         MaterialEditor materialEditor = null;
 
         public override void OnInspectorGUI()
         {
-            var useAsTemplateProp = serializedObject.FindProperty(ShaderGraphImporter.UseAsTemplateFieldName);
-            var exposeTemplateAsShaderProp = serializedObject.FindProperty(ShaderGraphImporter.ExposeTemplateAsShaderFieldName);
-            var templateProp = serializedObject.FindProperty(ShaderGraphImporter.TemplateFieldName);
-
-            serializedObject.Update();
-
             GraphData GetGraphData(AssetImporter importer)
             {
-                var textGraph = FileUtilities.ReadAllTextUTF8(importer.assetPath);
+                var textGraph = File.ReadAllText(importer.assetPath, Encoding.UTF8);
                 var graphObject = CreateInstance<GraphObject>();
                 graphObject.hideFlags = HideFlags.HideAndDontSave;
                 bool isSubGraph;
@@ -64,8 +62,7 @@ namespace UnityEditor.ShaderGraph
                 Debug.Assert(importer != null, "importer != null");
                 ShowGraphEditWindow(importer.assetPath);
             }
-
-            using (var horizontalScope = new GUILayout.HorizontalScope())
+            using (var horizontalScope = new GUILayout.HorizontalScope("box"))
             {
                 AssetImporter importer = target as AssetImporter;
                 string assetName = Path.GetFileNameWithoutExtension(importer.assetPath);
@@ -83,34 +80,16 @@ namespace UnityEditor.ShaderGraph
                 if (alreadyExists && GUILayout.Button("Regenerate"))
                     update = true;
 
-                var pathList = new List<string>();
-                pathList.Add(path);
-
                 if (update)
                 {
                     var graphData = GetGraphData(importer);
                     var generator = new Generator(graphData, null, GenerationMode.ForReals, assetName, humanReadable: true);
                     if (!GraphUtil.WriteToFile(path, generator.generatedShader))
                         open = false;
-                    var generatedShaderCount = 0;
-                    foreach (var generatedShader in generator.allGeneratedShaders)
-                    {
-                        if (generatedShaderCount > 0)
-                        {
-                            string pathSub = String.Format("Temp/GeneratedFromGraph-{0}_{1}.shader", assetName.Replace(" ", ""), generatedShaderCount);
-                            pathList.Add(pathSub);
-                            GraphUtil.WriteToFile(pathSub, generatedShader.codeString);
-                        }
-                        generatedShaderCount++;
-                    }
                 }
 
                 if (open)
-                {
-                    for (int i = 1; i < pathList.Count; ++i)
-                        GraphUtil.OpenFile(pathList[i]);
-                    GraphUtil.OpenFile(pathList[0]);
-                }
+                    GraphUtil.OpenFile(path);
             }
             if (Unsupported.IsDeveloperMode())
             {
@@ -136,17 +115,6 @@ namespace UnityEditor.ShaderGraph
                 GUIUtility.systemCopyBuffer = generator.generatedShader;
             }
 
-            EditorGUI.BeginDisabled(EditorApplication.isPlaying);
-            EditorGUILayout.Space();
-            EditorGUILayout.PropertyField(useAsTemplateProp);
-            using (new EditorGUI.IndentLevelScope(1))
-            using (new EditorGUI.DisabledScope(!useAsTemplateProp.boolValue))
-            {
-                EditorGUILayout.PropertyField(exposeTemplateAsShaderProp, new GUIContent("Expose as Shader", "Toggle whether or not the template shader should be exposed in shader dropdowns."));
-                EditorGUILayout.PropertyField(templateProp);
-            }
-            EditorGUI.EndDisabled();
-
             ApplyRevertGUI();
 
             if (materialEditor)
@@ -161,7 +129,7 @@ namespace UnityEditor.ShaderGraph
         public override void OnEnable()
         {
             base.OnEnable();
-            AssetImporter importer = (AssetImporter)target;
+            AssetImporter importer = target as AssetImporter;
             var material = AssetDatabase.LoadAssetAtPath<Material>(importer.assetPath);
             if (material)
                 materialEditor = (MaterialEditor)CreateEditor(material);
@@ -170,12 +138,11 @@ namespace UnityEditor.ShaderGraph
         public override void OnDisable()
         {
             base.OnDisable();
-
             if (materialEditor != null)
                 DestroyImmediate(materialEditor);
         }
 
-        internal static bool ShowGraphEditWindow(string path, bool disablePreviewsForTesting = false)
+        internal static bool ShowGraphEditWindow(string path)
         {
             var guid = AssetDatabase.AssetPathToGUID(path);
             var extension = Path.GetExtension(path);
@@ -191,16 +158,12 @@ namespace UnityEditor.ShaderGraph
             {
                 if (w.selectedGuid == guid)
                 {
-                    if (w.m_Parent != null)
-                    {
-                        w.Focus();
-                        return true;
-                    }
+                    w.Focus();
+                    return true;
                 }
             }
 
             var window = EditorWindow.CreateWindow<MaterialGraphEditWindow>(typeof(MaterialGraphEditWindow), typeof(SceneView));
-            window.m_DisablePreviewsForTesting = disablePreviewsForTesting;
             window.Initialize(guid);
             window.Focus();
             return true;
